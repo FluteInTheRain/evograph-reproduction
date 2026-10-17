@@ -31,12 +31,14 @@ DOC = {
 
 
 def norm(s):
+    """Chuẩn hóa chuỗi để so khớp đáp án: chữ thường, bỏ dấu câu, gộp khoảng trắng."""
     s = s.lower().strip()
     s = "".join(c for c in s if c not in set(string.punctuation))
     return " ".join(s.split())
 
 
 def f1(pred, gold):
+    """F1 theo tập đáp án (không phân biệt thứ tự); 0 nếu một trong hai tập rỗng."""
     p, g = {norm(x) for x in pred}, {norm(x) for x in gold}
     if not p or not g:
         return 0.0
@@ -48,6 +50,7 @@ def f1(pred, gold):
 
 
 def load_kb(path):
+    """Đọc kb.txt của MetaQA: mỗi dòng là một bộ ba head|relation|tail."""
     out = []
     with open(path, encoding="utf-8") as f:
         for line in f:
@@ -58,6 +61,7 @@ def load_kb(path):
 
 
 def load_qa(path, n, seed):
+    """Đọc câu hỏi MetaQA; thực thể chủ đề nằm trong [...]. Xáo theo seed rồi lấy n câu đầu."""
     qa = []
     with open(path, encoding="utf-8") as f:
         for line in f:
@@ -96,6 +100,7 @@ class KG:
         return out
 
     def two_hop_paths(self, topic, answers):
+        """Mọi đường 2 cạnh (không xét hướng) từ chủ đề tới một đáp án; dùng để chọn cạnh cần làm hỏng."""
         ans, paths = set(answers), []
         for t1 in self.by_ent.get(topic, ()):
             mid = t1[2] if t1[0] == topic else t1[0]
@@ -107,6 +112,8 @@ class KG:
 
 
 class Env:
+    """Môi trường của một câu hỏi: KG gốc cộng lớp phủ (removed/added) mô phỏng khuyết, nhiễu và các lần sửa."""
+
     def __init__(self, full, topic, answers, args, rng):
         self.full, self.rng, self.args = full, rng, args
         self.removed, self.added = set(), set()
@@ -122,11 +129,13 @@ class Env:
             self.corrupted = True
 
     def view(self, ent):
+        """Quan sát của GRAPH_RETRIEVE: fact quanh thực thể trong KG hiện tại (đã xóa cạnh, đã chèn cạnh sai/cạnh do tác tử thêm)."""
         names = set(self.full.resolve(ent)) or {ent}
         fs = (self.full.facts_of(ent) - self.removed) | {f for f in self.added if names & {f[0], f[2]}}
         return sorted(fs)
 
     def web(self, ent):
+        """Quan sát của WEB_SEARCH (mô phỏng): lấy từ KG gốc, mỗi fact có mặt với xác suất web_cov, đuôi bị thay sai với xác suất web_noise."""
         out = []
         for f in sorted(self.full.facts_of(ent)):
             if self.rng.random() > self.args.web_cov:
@@ -137,6 +146,7 @@ class Env:
         return out[: self.args.k]
 
     def edit(self, op, fact):
+        """GRAPH_EDIT: chèn hoặc xóa một fact trên lớp phủ của câu hỏi này (không ảnh hưởng câu khác)."""
         fact = tuple(fact)
         if len(fact) != 3:
             return "invalid fact"
@@ -153,6 +163,7 @@ class Env:
 
 
 def fmt(facts, k):
+    """Định dạng tối đa k fact thành văn bản đưa lại cho mô hình."""
     if not facts:
         return "(no facts found)"
     return "\n".join(" | ".join(f) for f in facts[:k])
@@ -173,6 +184,7 @@ def parse(txt):
 
 
 def run_one(client, args, allowed, env, question):
+    """Chạy tác tử cho một câu hỏi tới khi ANSWER hoặc hết T lượt. Trả về (đáp án, số lượt, đếm hành động)."""
     sys_p = SYSTEM.replace("{ACTIONS}", "\n".join(DOC[a] for a in sorted(allowed))).replace("{T}", str(args.T))
     msgs = [{"role": "system", "content": sys_p}, {"role": "user", "content": question}]
     counts = defaultdict(int)
@@ -186,7 +198,7 @@ def run_one(client, args, allowed, env, question):
                 if attempt == 5 or fatal:
                     raise
                 time.sleep(2 ** attempt * 2)
-        txt = r.choices[0].message.content or ""
+        txt = r.choices[0].message.content or ""  # mỗi lượt mô hình phải trả đúng một JSON hành động
         msgs.append({"role": "assistant", "content": txt})
         a = parse(txt)
         if not a or a.get("action") not in allowed:
