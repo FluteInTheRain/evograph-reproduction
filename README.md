@@ -19,7 +19,7 @@ wandb login
 ```
 
 ## Dữ liệu
-Tải MetaQA (https://github.com/yuyuz/MetaQA), cần hai tệp:
+Hai tệp MetaQA (https://github.com/yuyuz/MetaQA) đã có sẵn trong `data/`; nguồn gốc:
 - `kb.txt` (định dạng `head|relation|tail`)
 - `2-hop/vanilla/qa_test.txt`
 
