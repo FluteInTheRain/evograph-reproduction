@@ -8,13 +8,13 @@ Muốn chạy ngoài Colab với LLM bất kỳ tương thích OpenAI, dùng `--
 Mã chạy lại thực nghiệm trong báo cáo. Kết quả và mô tả giải pháp nằm trong báo cáo, không đặt ở đây.
 
 ## Môi trường
-- Python 3.10+, không cần GPU (gọi LLM qua API tương thích OpenAI, mặc định Groq).
-- Máy dùng để chạy: CPU thường, cần Internet.
+- Python 3.10+. Mã chỉ gọi LLM qua API tương thích OpenAI nên chính nó không cần GPU.
+- Cấu hình đã dùng cho báo cáo: Google Colab, GPU T4, Qwen2.5-7B-Instruct-AWQ chạy bằng vLLM (cổng 8000), xem `run_colab.ipynb`. Mặc định của `run.py` trỏ tới máy chủ này (`--base_url http://localhost:8000/v1`).
+- Dùng LLM khác: đổi `--model`, `--base_url`, `--api_key_env` (biến môi trường chứa khóa; nếu không đặt thì dùng `EMPTY`).
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-export GROQ_API_KEY=...        # khóa API của nhà cung cấp LLM
 wandb login
 ```
 
@@ -45,4 +45,4 @@ for p in 0.0 0.1 0.3 0.5; do
 done
 ```
 
-Tham số khác: `--model`, `--base_url`, `--api_key_env`, `--T`, `--k`, `--wrong`, `--web_cov`, `--seed` (xem `python run.py -h`).
+Tham số khác: `--model`, `--base_url`, `--api_key_env`, `--max_tokens`, `--T`, `--k`, `--wrong`, `--web_cov`, `--seed` (xem `python run.py -h`).

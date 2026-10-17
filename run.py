@@ -79,6 +79,21 @@ class KG:
             self.by_ent[t[0]].add(t)
             self.by_ent[t[2]].add(t)
         self.entities = list(self.by_ent)
+        self.lower = defaultdict(list)  # MetaQA có cặp trùng tên khác hoa/thường (vd. "Italian" / "italian")
+        for e in self.entities:
+            self.lower[e.lower().strip()].append(e)
+
+    def resolve(self, ent):
+        """Khớp chính xác trước; nếu không có thì khớp không phân biệt hoa/thường."""
+        if ent in self.by_ent:
+            return [ent]
+        return self.lower.get(str(ent).lower().strip(), [])
+
+    def facts_of(self, ent):
+        out = set()
+        for e in self.resolve(ent):
+            out |= self.by_ent[e]
+        return out
 
     def two_hop_paths(self, topic, answers):
         ans, paths = set(answers), []
@@ -107,12 +122,13 @@ class Env:
             self.corrupted = True
 
     def view(self, ent):
-        fs = (self.full.by_ent.get(ent, set()) - self.removed) | {f for f in self.added if ent in (f[0], f[2])}
+        names = set(self.full.resolve(ent)) or {ent}
+        fs = (self.full.facts_of(ent) - self.removed) | {f for f in self.added if names & {f[0], f[2]}}
         return sorted(fs)
 
     def web(self, ent):
         out = []
-        for f in sorted(self.full.by_ent.get(ent, set())):
+        for f in sorted(self.full.facts_of(ent)):
             if self.rng.random() > self.args.web_cov:
                 continue
             if self.rng.random() < self.args.web_noise:
@@ -143,11 +159,17 @@ def fmt(facts, k):
 
 
 def parse(txt):
-    m = re.search(r"\{.*\}", txt, re.S)
-    try:
-        return json.loads(m.group(0))
-    except Exception:
-        return None
+    """Lấy đối tượng JSON đầu tiên sau khi bỏ khối <think>...</think> (nếu có)."""
+    txt = re.sub(r"<think>.*?(</think>|$)", "", txt, flags=re.S)
+    dec = json.JSONDecoder()
+    for m in re.finditer(r"\{", txt):
+        try:
+            obj, _ = dec.raw_decode(txt[m.start():])
+        except ValueError:
+            continue
+        if isinstance(obj, dict):
+            return obj
+    return None
 
 
 def run_one(client, args, allowed, env, question):
@@ -157,7 +179,7 @@ def run_one(client, args, allowed, env, question):
     for step in range(args.T):
         for attempt in range(6):  # thử lại khi bị giới hạn tốc độ (429) hoặc lỗi mạng
             try:
-                r = client.chat.completions.create(model=args.model, messages=msgs, temperature=0, max_tokens=300)
+                r = client.chat.completions.create(model=args.model, messages=msgs, temperature=0, max_tokens=args.max_tokens)
                 break
             except Exception as e:
                 fatal = getattr(e, "status_code", None) in (400, 401, 402, 403, 404)
@@ -197,9 +219,10 @@ def main():
     ap.add_argument("--wrong", type=float, default=0.2, help="xác suất chèn 1 cạnh sai")
     ap.add_argument("--web_cov", type=float, default=0.8, help="xác suất một fact có trên 'web'")
     ap.add_argument("--web_noise", type=float, default=0.1, help="xác suất fact trên web bị sai")
-    ap.add_argument("--model", default="qwen/qwen3-32b")
-    ap.add_argument("--base_url", default="https://api.groq.com/openai/v1")
-    ap.add_argument("--api_key_env", default="GROQ_API_KEY")
+    ap.add_argument("--max_tokens", type=int, default=512, help="số token tối đa mỗi lượt")
+    ap.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct-AWQ")
+    ap.add_argument("--base_url", default="http://localhost:8000/v1")
+    ap.add_argument("--api_key_env", default="LLM_KEY")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--wandb_project", default="evograph-reproduction")
     ap.add_argument("--wandb_group", default="main-ablation")
@@ -207,12 +230,12 @@ def main():
 
     run = wandb.init(project=args.wandb_project, group=args.wandb_group,
                      name=f"{args.variant}-seed{args.seed}", config=vars(args))
-    client = OpenAI(base_url=args.base_url, api_key=os.environ[args.api_key_env])
+    client = OpenAI(base_url=args.base_url, api_key=os.environ.get(args.api_key_env, "EMPTY"))
     full = KG(load_kb(args.kb))
     qa = load_qa(args.qa, args.n, args.seed)
     allowed = VARIANTS[args.variant]
     tab = wandb.Table(columns=["question", "gold", "pred", "f1", "steps", "corrupted", "edits", "actions"])
-    hits = f1s = steps = edits = 0.0
+    hits = ems = f1s = steps = edits = 0.0
     c_hit = [0, 0]  # [đúng, tổng] trên câu bị làm khuyết/nhiễu
     n_c = 0
     for i, (q, topic, gold) in enumerate(qa):
@@ -228,16 +251,17 @@ def main():
             pred, st, cnt = [], args.T, {}
         s = f1(pred, gold)
         hit = float(any(norm(p) in {norm(g) for g in gold} for p in pred))
-        hits += hit; f1s += s; steps += st; edits += env.edits
+        em = float({norm(p) for p in pred} == {norm(g) for g in gold})
+        hits += hit; ems += em; f1s += s; steps += st; edits += env.edits
         if env.corrupted:
             n_c += 1; c_hit[0] += hit; c_hit[1] += 1
         tab.add_data(q, "|".join(gold), "|".join(pred), s, st, env.corrupted, env.edits, json.dumps(dict(cnt)))
         n = i + 1
-        wandb.log({"step": n, "hit_running": hits / n, "f1_running": f1s / n})
+        wandb.log({"step": n, "hit_running": hits / n, "em_running": ems / n, "f1_running": f1s / n})
     n = len(qa)
-    wandb.log({"hit": hits / n, "f1": f1s / n, "avg_turns": steps / n, "avg_edits": edits / n,
+    wandb.log({"hit": hits / n, "em": ems / n, "f1": f1s / n, "avg_turns": steps / n, "avg_edits": edits / n,
                "hit_on_corrupted": c_hit[0] / max(1, c_hit[1]), "n_corrupted": n_c, "n": n, "samples": tab})
-    print(f"[{args.variant}] hit={hits/n:.3f} f1={f1s/n:.3f} turns={steps/n:.2f} edits={edits/n:.2f}")
+    print(f"[{args.variant}] hit={hits/n:.3f} em={ems/n:.3f} f1={f1s/n:.3f} turns={steps/n:.2f} edits={edits/n:.2f}")
     run.finish()
 
 
