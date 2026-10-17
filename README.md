@@ -24,7 +24,7 @@ Hai tệp MetaQA (https://github.com/yuyuz/MetaQA) đã có sẵn trong `data/`;
 - `2-hop/vanilla/qa_test.txt`
 
 ## Chạy
-Mỗi lệnh ghi một run lên W&B (project `evograph-reproduction`).
+Mỗi lệnh ghi một run lên W&B (project `EvoGraph-R1`).
 
 ```bash
 # Bốn cấu hình chính (cùng seed 42, 100 câu)

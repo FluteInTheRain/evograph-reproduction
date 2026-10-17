@@ -236,7 +236,7 @@ def main():
     ap.add_argument("--base_url", default="http://localhost:8000/v1")
     ap.add_argument("--api_key_env", default="LLM_KEY")
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--wandb_project", default="evograph-reproduction")
+    ap.add_argument("--wandb_project", default="EvoGraph-R1")
     ap.add_argument("--wandb_group", default="main-ablation")
     args = ap.parse_args()
 
