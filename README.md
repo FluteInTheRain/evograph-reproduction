@@ -1,16 +1,24 @@
 # EvoGraph-R1 (rút gọn) — mã tái lập
 
 ## Chạy trên Google Colab
-Mở [`run_colab.ipynb`](https://colab.research.google.com/github/FluteInTheRain/evograph-reproduction/blob/main/run_colab.ipynb), chọn Runtime GPU T4 và chạy lần lượt các ô. Notebook cài môi trường, tải dữ liệu, khởi động LLM và chạy mọi thực nghiệm. Có hai lựa chọn LLM: `local` (Qwen2.5-7B-Instruct-AWQ chạy bằng vLLM trên T4, không cần API key) hoặc `gemini` (khóa `GEMINI_API_KEY` trong Colab Secrets).
-
-Muốn chạy ngoài Colab với LLM bất kỳ tương thích OpenAI, dùng `--model`, `--base_url`, `--api_key_env` như bên dưới.
+Mở [`run_colab.ipynb`](https://colab.research.google.com/github/FluteInTheRain/evograph-reproduction/blob/main/run_colab.ipynb), chọn Runtime GPU T4 và chạy lần lượt các ô (Run All). Notebook clone repo, đăng nhập W&B (cần dán API key khi được hỏi), kiểm tra dữ liệu, khởi động LLM rồi chạy các thực nghiệm. Ô đầu có hai tham số: `BACKEND` (`"local"` hoặc `"gemini"`) và `N` (số câu hỏi, mặc định 100; đặt 5 để chạy thử nhanh).
+- `local`: Qwen2.5-7B-Instruct-AWQ chạy bằng vLLM trên T4, không cần API key.
+- `gemini`: cần khóa `GEMINI_API_KEY` trong Colab Secrets.
 
 Mã chạy lại thực nghiệm trong báo cáo. Kết quả và mô tả giải pháp nằm trong báo cáo, không đặt ở đây.
 
 ## Môi trường
-- Python 3.10+. Mã chỉ gọi LLM qua API tương thích OpenAI nên chính nó không cần GPU.
-- Cấu hình đã dùng cho báo cáo: Google Colab, GPU T4, Qwen2.5-7B-Instruct-AWQ chạy bằng vLLM (cổng 8000), xem `run_colab.ipynb`. Mặc định của `run.py` trỏ tới máy chủ này (`--base_url http://localhost:8000/v1`).
-- Dùng LLM khác: đổi `--model`, `--base_url`, `--api_key_env` (biến môi trường chứa khóa; nếu không đặt thì dùng `EMPTY`).
+- Python 3.10+. `run.py` chỉ gọi LLM qua API tương thích OpenAI nên chính nó không cần GPU.
+- Cấu hình đã dùng cho báo cáo: Google Colab, GPU T4, Qwen2.5-7B-Instruct-AWQ chạy bằng vLLM (cổng 8000). Mặc định của `run.py` trỏ tới máy chủ này (`--base_url http://localhost:8000/v1`).
+- Chạy ngoài Colab: cần một máy chủ tương thích OpenAI ở địa chỉ trên, ví dụ trên máy có GPU:
+
+```bash
+pip install vllm
+python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-7B-Instruct-AWQ \
+  --quantization awq --dtype half --max-model-len 6144 --port 8000
+```
+
+  Dùng LLM khác thì đổi `--model`, `--base_url`, `--api_key_env` (biến môi trường chứa khóa; nếu không đặt thì dùng `EMPTY`).
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
