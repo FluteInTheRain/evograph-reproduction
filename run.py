@@ -155,7 +155,14 @@ def run_one(client, args, allowed, env, question):
     msgs = [{"role": "system", "content": sys_p}, {"role": "user", "content": question}]
     counts = defaultdict(int)
     for step in range(args.T):
-        r = client.chat.completions.create(model=args.model, messages=msgs, temperature=0, max_tokens=300)
+        for attempt in range(6):  # thử lại khi bị giới hạn tốc độ (429) hoặc lỗi mạng
+            try:
+                r = client.chat.completions.create(model=args.model, messages=msgs, temperature=0, max_tokens=300)
+                break
+            except Exception as e:
+                if attempt == 5:
+                    raise
+                time.sleep(2 ** attempt * 2)
         txt = r.choices[0].message.content or ""
         msgs.append({"role": "assistant", "content": txt})
         a = parse(txt)

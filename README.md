@@ -1,5 +1,10 @@
 # EvoGraph-R1 (rút gọn) — mã tái lập
 
+## Chạy trên Google Colab
+Mở [`run_colab.ipynb`](https://colab.research.google.com/github/FluteInTheRain/evograph-reproduction/blob/main/run_colab.ipynb), chọn Runtime GPU T4 và chạy lần lượt các ô. Notebook cài môi trường, tải dữ liệu, khởi động LLM và chạy mọi thực nghiệm. Có hai lựa chọn LLM: `local` (Qwen2.5-7B-Instruct-AWQ chạy bằng vLLM trên T4, không cần API key) hoặc `gemini` (khóa `GEMINI_API_KEY` trong Colab Secrets).
+
+Muốn chạy ngoài Colab với LLM bất kỳ tương thích OpenAI, dùng `--model`, `--base_url`, `--api_key_env` như bên dưới.
+
 Mã chạy lại thực nghiệm trong báo cáo. Kết quả và mô tả giải pháp nằm trong báo cáo, không đặt ở đây.
 
 ## Môi trường
