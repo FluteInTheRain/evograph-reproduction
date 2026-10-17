@@ -160,7 +160,8 @@ def run_one(client, args, allowed, env, question):
                 r = client.chat.completions.create(model=args.model, messages=msgs, temperature=0, max_tokens=300)
                 break
             except Exception as e:
-                if attempt == 5:
+                fatal = getattr(e, "status_code", None) in (400, 401, 402, 403, 404)
+                if attempt == 5 or fatal:
                     raise
                 time.sleep(2 ** attempt * 2)
         txt = r.choices[0].message.content or ""
@@ -219,6 +220,9 @@ def main():
         try:
             pred, st, cnt = run_one(client, args, allowed, env, q)
         except Exception as e:  # lỗi API
+            if getattr(e, "status_code", None) in (400, 401, 402, 403, 404):
+                run.finish(exit_code=1)
+                raise
             print("API error:", e)
             time.sleep(5)
             pred, st, cnt = [], args.T, {}
